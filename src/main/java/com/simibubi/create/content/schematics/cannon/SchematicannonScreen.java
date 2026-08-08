@@ -315,6 +315,10 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 		if ("schematicErrored".equals(be.statusMsg))
 			graphics.drawString(font, CreateLang.translateDirect("schematicannon.status.schematicErroredCheckLogs"),
 				x + 103 - stringWidth / 2, y + 65, 0xDDEEFF);
+		if ("schematicCorrupted".equals(be.statusMsg)) {
+			Component retry = CreateLang.translateDirect("schematicannon.status.schematicCorruptedRetry");
+			graphics.drawString(font, retry, x + 103 - font.width(retry) / 2, y + 65, 0xDDEEFF);
+		}
 	}
 
 	protected void renderBlueprintHighlight(GuiGraphics graphics, int x, int y) {

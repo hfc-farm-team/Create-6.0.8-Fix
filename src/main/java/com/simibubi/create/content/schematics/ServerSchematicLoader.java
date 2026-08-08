@@ -25,10 +25,12 @@ import com.simibubi.create.infrastructure.config.CSchematics;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.ChatFormatting;
+import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -235,8 +237,8 @@ public class ServerSchematicLoader {
 	}
 
 	public void handleFinishedUpload(ServerPlayer player, String schematic) {
-		String playerSchematicId = player.getGameProfile()
-			.getName() + "/" + schematic;
+		String playerName = player.getGameProfile().getName();
+		String playerSchematicId = playerName + "/" + schematic;
 
 		if (activeUploads.containsKey(playerSchematicId)) {
 			try {
@@ -245,7 +247,6 @@ public class ServerSchematicLoader {
 				Level world = removed.world;
 				BlockPos pos = removed.tablePos;
 
-				Create.LOGGER.info("New Schematic Uploaded: " + playerSchematicId);
 				if (pos == null)
 					return;
 
@@ -257,12 +258,49 @@ public class ServerSchematicLoader {
 				if (table == null)
 					return;
 				table.finishUpload();
-				table.inventory.setStackInSlot(1, SchematicItem.create(world, schematic, player.getGameProfile()
-					.getName()));
 
+				if (removed.bytesUploaded != removed.totalBytes) {
+					rejectFinishedUpload(player, playerSchematicId, table);
+					Create.LOGGER.warn(
+						"Rejected incomplete schematic upload: dimension={}, x={}, y={}, z={}, owner='{}', file='{}', expectedBytes={}, receivedBytes={}",
+						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), playerName, schematic,
+						removed.totalBytes, removed.bytesUploaded);
+					return;
+				}
+
+				ItemStack completedSchematic;
+				try {
+					completedSchematic = SchematicItem.create(world, schematic, playerName);
+				} catch (ReportedException e) {
+					if (!SchematicReadFailure.isUnexpectedEOF(e))
+						throw e;
+					rejectFinishedUpload(player, playerSchematicId, table);
+					Create.LOGGER.warn(
+						"Rejected truncated schematic upload: dimension={}, x={}, y={}, z={}, owner='{}', file='{}'",
+						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), playerName, schematic, e);
+					return;
+				}
+
+				table.inventory.setStackInSlot(1, completedSchematic);
+				Create.LOGGER.info("New Schematic Uploaded: {}", playerSchematicId);
 			} catch (IOException e) {
 				Create.LOGGER.error("Exception Thrown when finishing Upload: {}", playerSchematicId, e);
 			}
+		}
+	}
+
+	private void rejectFinishedUpload(ServerPlayer player, String playerSchematicId, SchematicTableBlockEntity table) {
+		table.inventory.setStackInSlot(1, new ItemStack(AllItems.EMPTY_SCHEMATIC.get()));
+		player.sendSystemMessage(CreateLang.translateDirect("schematics.corrupted")
+			.withStyle(ChatFormatting.RED));
+
+		Path rejectedFile = CreatePaths.UPLOADED_SCHEMATICS_DIR.resolve(playerSchematicId).normalize();
+		if (!rejectedFile.startsWith(CreatePaths.UPLOADED_SCHEMATICS_DIR))
+			return;
+		try {
+			Files.deleteIfExists(rejectedFile);
+		} catch (IOException e) {
+			Create.LOGGER.error("Failed to delete rejected Schematic Upload: {}", playerSchematicId, e);
 		}
 	}
 

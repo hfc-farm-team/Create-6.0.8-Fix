@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.AllSoundEvents;
+import com.simibubi.create.Create;
 import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.kinetics.belt.BeltBlockEntity;
 import com.simibubi.create.content.kinetics.belt.BeltBlockEntity.CasingType;
@@ -33,6 +34,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Direction.AxisDirection;
+import net.minecraft.ReportedException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -118,7 +120,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		this.state = State.STOPPED;
 		replaceMode = 2;
 		checklist = new MaterialChecklist();
-		printer = new SchematicPrinter();
+		printer = new SchematicPrinter(true);
 	}
 
 	public void findInventories() {
@@ -325,6 +327,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		// Initialize Printer
 		if (!printer.isLoaded()) {
 			initializePrinter(blueprint);
+			handleTruncatedSchematicFailure(blueprint);
 			return;
 		}
 
@@ -451,6 +454,8 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 
 		// Load blocks into reader
 		printer.loadSchematic(blueprint, level, true);
+		if (handleTruncatedSchematicFailure(blueprint))
+			return;
 
 		if (printer.isErrored()) {
 			state = State.STOPPED;
@@ -486,6 +491,28 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		updateChecklist();
 		sendUpdate = true;
 		blocksToPlace += blocksPlaced;
+	}
+
+	private boolean handleTruncatedSchematicFailure(ItemStack blueprint) {
+		ReportedException exception = printer.consumeTruncatedSchematicException();
+		if (exception == null)
+			return false;
+
+		state = State.STOPPED;
+		statusMsg = "schematicCorrupted";
+		inventory.setStackInSlot(0, ItemStack.EMPTY);
+		inventory.setStackInSlot(1, new ItemStack(AllItems.EMPTY_SCHEMATIC.get()));
+		printer.resetSchematic();
+		sendUpdate = true;
+
+		CompoundTag tag = blueprint.getTag();
+		String owner = tag == null ? "<unknown>" : tag.getString("Owner");
+		String file = tag == null ? "<unknown>" : tag.getString("File");
+		BlockPos pos = getBlockPos();
+		Create.LOGGER.warn(
+			"Rejected truncated schematic in Schematicannon: dimension={}, x={}, y={}, z={}, owner='{}', file='{}'",
+			level.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), owner, file, exception);
+		return true;
 	}
 
 	protected ItemStack getItemForBlock(BlockState blockState) {
@@ -700,8 +727,10 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 			return;
 
 		if (!printer.isLoaded()) {
-			if (!blueprint.isEmpty())
+			if (!blueprint.isEmpty()) {
 				initializePrinter(blueprint);
+				handleTruncatedSchematicFailure(blueprint);
+			}
 			return;
 		}
 

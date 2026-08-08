@@ -450,6 +450,7 @@
 
 	"create.schematics.synchronizing": "Syncing...",
 	"create.schematics.uploadTooLarge": "Your schematic exceeds limitations specified by the server.",
+	"create.schematics.corrupted": "The schematic file is corrupted. Please upload it again.",
 	"create.schematics.maxAllowedSize": "The maximum allowed schematic file size is:",
   "create.schematics.wrongFormat": "The schematic you are trying to upload is either corrupt or encoded wrongly! It should be encoded with GZIP compatible format.",
 
@@ -506,6 +507,8 @@
 	"create.schematicannon.status.schematicExpired": "Schematic File Expired",
 	"create.schematicannon.status.schematicErrored": "Incompatible Blocks",
 	"create.schematicannon.status.schematicErroredCheckLogs": "Check Server Logs",
+	"create.schematicannon.status.schematicCorrupted": "Schematic File Corrupted",
+	"create.schematicannon.status.schematicCorruptedRetry": "Please upload the schematic again",
 
 	"create.materialChecklist": "Material Checklist",
 	"create.materialChecklist.blocksNotLoaded": "* Disclaimer *\n\nMaterial List may be inaccurate due to relevant chunks not being loaded.",

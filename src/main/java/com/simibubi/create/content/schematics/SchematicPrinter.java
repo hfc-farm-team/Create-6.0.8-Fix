@@ -15,6 +15,7 @@ import com.simibubi.create.foundation.utility.BlockHelper;
 
 import net.createmod.catnip.levelWrappers.SchematicLevel;
 import net.createmod.catnip.math.BBHelper;
+import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -41,8 +42,10 @@ public class SchematicPrinter {
 		BLOCKS, DEFERRED_BLOCKS, ENTITIES
 	}
 
+	private final boolean recoverTruncatedReads;
 	private boolean schematicLoaded;
 	private boolean isErrored;
+	private ReportedException pendingTruncatedSchematicException;
 	private SchematicLevel blockReader;
 	private BlockPos schematicAnchor;
 
@@ -52,6 +55,11 @@ public class SchematicPrinter {
 	private List<BlockPos> deferredBlocks;
 
 	public SchematicPrinter() {
+		this(false);
+	}
+
+	public SchematicPrinter(boolean recoverTruncatedReads) {
+		this.recoverTruncatedReads = recoverTruncatedReads;
 		printingEntityIndex = -1;
 		printStage = PrintStage.BLOCKS;
 		deferredBlocks = new LinkedList<>();
@@ -90,11 +98,21 @@ public class SchematicPrinter {
 	}
 
 	public void loadSchematic(ItemStack blueprint, Level originalWorld, boolean processNBT) {
+		pendingTruncatedSchematicException = null;
 		if (!blueprint.hasTag() || !blueprint.getTag().getBoolean("Deployed"))
 			return;
 
-		StructureTemplate activeTemplate =
-			SchematicItem.loadSchematic(originalWorld, blueprint);
+		StructureTemplate activeTemplate;
+		try {
+			activeTemplate = SchematicItem.loadSchematic(originalWorld, blueprint);
+		} catch (ReportedException e) {
+			if (!recoverTruncatedReads || !SchematicReadFailure.isUnexpectedEOF(e))
+				throw e;
+			schematicLoaded = true;
+			isErrored = true;
+			pendingTruncatedSchematicException = e;
+			return;
+		}
 		StructurePlaceSettings settings = SchematicItem.getSettings(blueprint, processNBT);
 
 		schematicAnchor = NbtUtils.readBlockPos(blueprint.getTag()
@@ -129,6 +147,7 @@ public class SchematicPrinter {
 	}
 
 	public void resetSchematic() {
+		// Keep a pending EOF failure until the owning cannon has completed its compatibility-safe rollback.
 		schematicLoaded = false;
 		schematicAnchor = null;
 		isErrored = false;
@@ -145,6 +164,12 @@ public class SchematicPrinter {
 
 	public boolean isErrored() {
 		return isErrored;
+	}
+
+	public ReportedException consumeTruncatedSchematicException() {
+		ReportedException exception = pendingTruncatedSchematicException;
+		pendingTruncatedSchematicException = null;
+		return exception;
 	}
 
 	public BlockPos getCurrentTarget() {
