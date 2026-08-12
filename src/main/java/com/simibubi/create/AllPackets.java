@@ -272,7 +272,7 @@ public enum AllPackets {
 	}
 
 	public static final ResourceLocation CHANNEL_NAME = Create.asResource("main");
-	public static final int NETWORK_VERSION = 608003;  // 6.0.8 第三次修复
+	public static final int NETWORK_VERSION = 608004;  // 6.0.8 第4次修复
 	public static final String NETWORK_VERSION_STR = String.valueOf(NETWORK_VERSION);
 	private static SimpleChannel channel;
 
