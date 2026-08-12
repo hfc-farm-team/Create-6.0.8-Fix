@@ -161,6 +161,11 @@ public class ToolboxInventory extends ItemStackHandler {
 		super.deserializeNBT(nbt);
 	}
 
+	@Override
+	public void setSize(int size) {
+		super.setSize(8 * STACKS_PER_COMPARTMENT);
+	}
+
 	public ItemStack distributeToCompartment(@Nonnull ItemStack stack, int compartment, boolean simulate) {
 		if (stack.isEmpty())
 			return stack;
