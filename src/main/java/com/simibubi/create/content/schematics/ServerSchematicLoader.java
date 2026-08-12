@@ -237,8 +237,8 @@ public class ServerSchematicLoader {
 	}
 
 	public void handleFinishedUpload(ServerPlayer player, String schematic) {
-		String playerName = player.getGameProfile().getName();
-		String playerSchematicId = playerName + "/" + schematic;
+		String playerSchematicId = player.getGameProfile()
+			.getName() + "/" + schematic;
 
 		if (activeUploads.containsKey(playerSchematicId)) {
 			try {
@@ -263,21 +263,21 @@ public class ServerSchematicLoader {
 					rejectFinishedUpload(player, playerSchematicId, table);
 					Create.LOGGER.warn(
 						"Rejected incomplete schematic upload: dimension={}, x={}, y={}, z={}, owner='{}', file='{}', expectedBytes={}, receivedBytes={}",
-						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), playerName, schematic,
+						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), player.getGameProfile().getName(), schematic,
 						removed.totalBytes, removed.bytesUploaded);
 					return;
 				}
 
 				ItemStack completedSchematic;
 				try {
-					completedSchematic = SchematicItem.create(world, schematic, playerName);
+					completedSchematic = SchematicItem.create(world, schematic, player.getGameProfile().getName());
 				} catch (ReportedException e) {
 					if (!SchematicReadFailure.isUnexpectedEOF(e))
 						throw e;
 					rejectFinishedUpload(player, playerSchematicId, table);
 					Create.LOGGER.warn(
 						"Rejected truncated schematic upload: dimension={}, x={}, y={}, z={}, owner='{}', file='{}'",
-						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), playerName, schematic, e);
+						world.dimension().location(), pos.getX(), pos.getY(), pos.getZ(), player.getGameProfile().getName(), schematic, e);
 					return;
 				}
 
