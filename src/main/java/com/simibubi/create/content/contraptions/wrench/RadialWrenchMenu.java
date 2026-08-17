@@ -52,6 +52,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 
+import javax.annotation.Nullable;
+
 public class RadialWrenchMenu extends AbstractSimiScreen {
 
 	public static final Map<Property<?>, String> VALID_PROPERTIES = new HashMap<>();
@@ -90,6 +92,7 @@ public class RadialWrenchMenu extends AbstractSimiScreen {
 
 	private final BlockState state;
 	private final BlockPos pos;
+	@Nullable
 	private final BlockEntity blockEntity;
 	private final Level level;
 	private final NonVisualizationLevel nonVisualizationLevel;
@@ -232,6 +235,23 @@ public class RadialWrenchMenu extends AbstractSimiScreen {
 
 	}
 
+	private void withLevel(@Nullable BlockEntity blockEntity, Level newLevel, Runnable action) {
+		boolean hasBlockEntity = blockEntity != null;
+		Level originalLevel = null;
+
+		if (hasBlockEntity) {
+			originalLevel = blockEntity.getLevel();
+			blockEntity.setLevel(newLevel);
+		}
+
+		try {
+			action.run();
+		} finally {
+			if (hasBlockEntity)
+				blockEntity.setLevel(originalLevel);
+		}
+	}
+
 	private void renderRadialSectors(GuiGraphics graphics) {
 		int sectors = allStates.size();
 		if (sectors < 2)
@@ -273,14 +293,13 @@ public class RadialWrenchMenu extends AbstractSimiScreen {
 			poseStack.translate(0, 0, 100);
 
 			try {
-				Level previousLevel = blockEntity.getLevel();
-				blockEntity.setLevel(nonVisualizationLevel);
-				GuiGameElement.of(blockState, blockEntity)
-					.rotateBlock(player.getXRot(), player.getYRot() + 180, 0f)
-					.scale(24)
-					.at(-12, 12)
-					.render(graphics);
-				blockEntity.setLevel(previousLevel);
+				withLevel(blockEntity, nonVisualizationLevel,
+					() -> GuiGameElement.of(blockState, blockEntity)
+						.rotateBlock(player.getXRot(), player.getYRot() + 180, 0f)
+						.scale(24)
+						.at(-12, 12)
+						.render(graphics)
+				);
 			} catch (Exception e) {
 				Create.LOGGER.warn("Failed to render blockstate in RadialWrenchMenu", e);
 				allStates.remove(i);
