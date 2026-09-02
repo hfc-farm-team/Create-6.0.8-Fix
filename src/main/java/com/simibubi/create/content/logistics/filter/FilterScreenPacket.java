@@ -45,6 +45,11 @@ public class FilterScreenPacket extends SimplePacketBase {
 			if (player == null)
 				return;
 
+			// UPDATE_FILTER_ITEM has no legitimate client sender.
+			// Do not accept a client-supplied ItemStack/NBT into server ghost state.
+			if (option == Option.UPDATE_FILTER_ITEM)
+				return;
+
 			if (player.containerMenu instanceof FilterMenu c) {
 				if (option == Option.WHITELIST)
 					c.blacklist = false;
@@ -54,10 +59,10 @@ public class FilterScreenPacket extends SimplePacketBase {
 					c.respectNBT = true;
 				if (option == Option.IGNORE_DATA)
 					c.respectNBT = false;
-				if (option == Option.UPDATE_FILTER_ITEM)
+				/*if (option == Option.UPDATE_FILTER_ITEM)
 					c.ghostInventory.setStackInSlot(
 							data.getInt("Slot"),
-							net.minecraft.world.item.ItemStack.of(data.getCompound("Item")));
+							net.minecraft.world.item.ItemStack.of(data.getCompound("Item")));*/
 			}
 
 			if (player.containerMenu instanceof AttributeFilterMenu c) {
@@ -72,7 +77,7 @@ public class FilterScreenPacket extends SimplePacketBase {
 				if (option == Option.ADD_INVERTED_TAG)
 					c.appendSelectedAttribute(ItemAttribute.loadStatic(data), true);
 			}
-			
+
 			if (player.containerMenu instanceof PackageFilterMenu c) {
 				if (option == Option.UPDATE_ADDRESS)
 					c.address = data.getString("Address");
