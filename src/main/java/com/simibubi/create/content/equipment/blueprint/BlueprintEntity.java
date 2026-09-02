@@ -381,12 +381,17 @@ public class BlueprintEntity extends HangingEntity
 					for (int slot = 0; slot < playerInv.getSlots(); slot++) {
 						if (!requestedItem.test(level(), playerInv.getStackInSlot(slot)))
 							continue;
+
 						ItemStack currentItem = playerInv.extractItem(slot, 1, false);
+						if (currentItem.isEmpty())
+							continue;
+
 						if (stacksTaken.containsKey(slot))
 							stacksTaken.get(slot)
 								.grow(1);
 						else
 							stacksTaken.put(slot, currentItem.copy());
+
 						craftingGrid.put(i, currentItem);
 						continue Search;
 					}

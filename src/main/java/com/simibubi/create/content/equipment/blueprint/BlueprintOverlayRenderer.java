@@ -245,7 +245,11 @@ public class BlueprintOverlayRenderer {
 				for (int slot = 0; slot < playerInv.getSlots(); slot++) {
 					if (!requestedItem.test(mc.level, playerInv.getStackInSlot(slot)))
 						continue;
+
 					ItemStack currentItem = playerInv.extractItem(slot, 1, false);
+					if (currentItem.isEmpty())
+						continue;
+
 					craftingGrid.put(i, currentItem);
 					newlyAdded.add(currentItem);
 					continue Search;
