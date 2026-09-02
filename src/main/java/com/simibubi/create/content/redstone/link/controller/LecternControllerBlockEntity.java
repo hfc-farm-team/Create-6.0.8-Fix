@@ -31,7 +31,7 @@ import net.minecraftforge.items.ItemStackHandler;
 
 public class LecternControllerBlockEntity extends SmartBlockEntity {
 
-	private ItemStackHandler controllerFreq;
+	private ItemStackHandler controllerFreq = new ItemStackHandler(12);
 	private UUID user;
 	private UUID prevUser;    // used only on client
 	private boolean deactivatedThisTick;    // used only on server
