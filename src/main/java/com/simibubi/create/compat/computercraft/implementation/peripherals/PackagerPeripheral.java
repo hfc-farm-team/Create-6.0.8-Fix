@@ -3,19 +3,26 @@ package com.simibubi.create.compat.computercraft.implementation.peripherals;
 import java.util.Map;
 import java.util.Optional;
 
-import dan200.computercraft.api.peripheral.IComputerAccess;
-import net.minecraft.world.item.ItemStack;
-
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import com.simibubi.create.compat.computercraft.implementation.ComputerUtil;
 import com.simibubi.create.compat.computercraft.implementation.luaObjects.PackageLuaObject;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
-import com.simibubi.create.compat.computercraft.implementation.ComputerUtil;
 
 import com.simibubi.create.compat.computercraft.events.ComputerEvent;
 import com.simibubi.create.compat.computercraft.events.PackageEvent;
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.lua.LuaException;
+import dan200.computercraft.api.peripheral.IComputerAccess;
+import dan200.computercraft.api.peripheral.IPeripheral;
+import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.ItemHandlerHelper;
+import net.minecraftforge.items.wrapper.InvWrapper;
 
 public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 
@@ -83,6 +90,71 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 		if (box.isEmpty())
 			return null;
 		return new PackageLuaObject(blockEntity, box);
+	}
+
+	@LuaFunction(mainThread = true)
+	public final int pushPackage(IComputerAccess computer, String toName, Optional<Integer> toSlot) throws LuaException {
+		IItemHandler from = blockEntity.inventory;
+		IPeripheral target = computer.getAvailablePeripheral(toName);
+		if (target == null)
+			throw new LuaException("Target '" + toName + "' does not exist");
+		IItemHandler to = extractHandler(target);
+		if (to == null)
+			throw new LuaException("Target '" + toName + "' is not an inventory");
+		if (toSlot.isPresent() && (toSlot.get() < 1 || toSlot.get() > to.getSlots()))
+			throw new LuaException("To slot out of range");
+
+		return moveItem(from, 0, to, toSlot.orElse(0) - 1, Integer.MAX_VALUE);
+	}
+
+	@LuaFunction(mainThread = true)
+	public final int pullPackage(IComputerAccess computer, String fromName, int fromSlot) throws LuaException {
+		IPeripheral source = computer.getAvailablePeripheral(fromName);
+		if (source == null)
+			throw new LuaException("Source '" + fromName + "' does not exist");
+		IItemHandler from = extractHandler(source);
+		if (from == null)
+			throw new LuaException("Source '" + fromName + "' is not an inventory");
+		IItemHandler to = blockEntity.inventory;
+
+		if (fromSlot < 1 || fromSlot > from.getSlots())
+			throw new LuaException("From slot out of range");
+
+		return moveItem(from, fromSlot - 1, to, -1, Integer.MAX_VALUE);
+	}
+
+	@Nullable
+	private static IItemHandler extractHandler(IPeripheral peripheral) {
+		Object target = peripheral.getTarget();
+
+		if (target instanceof BlockEntity blockEntity) {
+			if (blockEntity.isRemoved())
+				return null;
+			IItemHandler handler = blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER, null)
+				.resolve()
+				.orElse(null);
+			if (handler != null)
+				return handler;
+		}
+
+		if (target instanceof IItemHandler handler)
+			return handler;
+		if (target instanceof Container container)
+			return new InvWrapper(container);
+		return null;
+	}
+
+	private static int moveItem(IItemHandler from, int fromSlot, IItemHandler to, int toSlot, int limit) {
+		ItemStack stack = from.extractItem(fromSlot, limit, true);
+		if (stack.isEmpty())
+			return 0;
+
+		ItemStack leftover = toSlot >= 0 ? to.insertItem(toSlot, stack, false)
+			: ItemHandlerHelper.insertItemStacked(to, stack, false);
+		int moved = stack.getCount() - leftover.getCount();
+		if (moved > 0)
+			from.extractItem(fromSlot, moved, false);
+		return moved;
 	}
 
 	@Override
