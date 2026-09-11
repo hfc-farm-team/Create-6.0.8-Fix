@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import com.simibubi.create.compat.computercraft.implementation.ComputerUtil;
-import com.simibubi.create.compat.computercraft.implementation.luaObjects.InventoryLuaObject;
 import com.simibubi.create.compat.computercraft.implementation.luaObjects.PackageLuaObject;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 
@@ -59,12 +58,12 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 
 	@LuaFunction(mainThread = true)
 	public Map<Integer, Map<String, ?>> list() {
-		return ComputerUtil.list(blockEntity.inventory);
+		return ComputerUtil.list(blockEntity.targetInventory.getInventory());
 	}
 
 	@LuaFunction(mainThread = true)
 	public Map<String, ?> getItemDetail(int slot) throws LuaException {
-		return ComputerUtil.getItemDetail(blockEntity.inventory, slot);
+		return ComputerUtil.getItemDetail(blockEntity.targetInventory.getInventory(), slot);
 	}
 
 	@LuaFunction(mainThread = true)
@@ -93,28 +92,8 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 		return new PackageLuaObject(blockEntity, box);
 	}
 
-	/**
-	 * Get a read-only view of the inventory attached to the packager (the work inventory behind it).
-	 * The returned object exposes {@code list()} and {@code getItemDetail(slot)}.
-	 */
 	@LuaFunction(mainThread = true)
-	public final InventoryLuaObject getInventory() {
-		return new InventoryLuaObject(blockEntity);
-	}
-
-	/**
-	 * Move a box out of the packager into another inventory on the same wired network.
-	 * Mirrors the generic inventory API that existed before the custom package API replaced it.
-	 *
-	 * @param computer The computer calling this method (injected by CC:Tweaked)
-	 * @param toName   The name of the peripheral to push to
-	 * @param fromSlot The slot in the packager (always 1) to move from
-	 * @param limit    The maximum number of items to move
-	 * @param toSlot   The slot in the target inventory to move to
-	 */
-	@LuaFunction(mainThread = true)
-	public final int pushItems(IComputerAccess computer, String toName, int fromSlot, Optional<Integer> limit,
-		Optional<Integer> toSlot) throws LuaException {
+	public final int pushPackage(IComputerAccess computer, String toName, Optional<Integer> toSlot) throws LuaException {
 		IItemHandler from = blockEntity.inventory;
 		IPeripheral target = computer.getAvailablePeripheral(toName);
 		if (target == null)
@@ -122,31 +101,14 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 		IItemHandler to = extractHandler(target);
 		if (to == null)
 			throw new LuaException("Target '" + toName + "' is not an inventory");
-
-		int actualLimit = limit.orElse(Integer.MAX_VALUE);
-		if (fromSlot < 1 || fromSlot > from.getSlots())
-			throw new LuaException("From slot out of range");
 		if (toSlot.isPresent() && (toSlot.get() < 1 || toSlot.get() > to.getSlots()))
 			throw new LuaException("To slot out of range");
-		if (actualLimit <= 0)
-			return 0;
 
-		return moveItem(from, fromSlot - 1, to, toSlot.orElse(0) - 1, actualLimit);
+		return moveItem(from, 0, to, toSlot.orElse(0) - 1, Integer.MAX_VALUE);
 	}
 
-	/**
-	 * Move a box from another inventory on the same wired network into the packager, to be unpacked.
-	 * Mirrors the generic inventory API that existed before the custom package API replaced it.
-	 *
-	 * @param computer The computer calling this method (injected by CC:Tweaked)
-	 * @param fromName The name of the peripheral to pull from
-	 * @param fromSlot The slot in the source inventory to move from
-	 * @param limit    The maximum number of items to move
-	 * @param toSlot   The slot in the packager (always 1) to move to
-	 */
 	@LuaFunction(mainThread = true)
-	public final int pullItems(IComputerAccess computer, String fromName, int fromSlot, Optional<Integer> limit,
-		Optional<Integer> toSlot) throws LuaException {
+	public final int pullPackage(IComputerAccess computer, String fromName, int fromSlot) throws LuaException {
 		IPeripheral source = computer.getAvailablePeripheral(fromName);
 		if (source == null)
 			throw new LuaException("Source '" + fromName + "' does not exist");
@@ -155,20 +117,12 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 			throw new LuaException("Source '" + fromName + "' is not an inventory");
 		IItemHandler to = blockEntity.inventory;
 
-		int actualLimit = limit.orElse(Integer.MAX_VALUE);
 		if (fromSlot < 1 || fromSlot > from.getSlots())
 			throw new LuaException("From slot out of range");
-		if (toSlot.isPresent() && (toSlot.get() < 1 || toSlot.get() > to.getSlots()))
-			throw new LuaException("To slot out of range");
-		if (actualLimit <= 0)
-			return 0;
 
-		return moveItem(from, fromSlot - 1, to, toSlot.orElse(0) - 1, actualLimit);
+		return moveItem(from, fromSlot - 1, to, -1, Integer.MAX_VALUE);
 	}
 
-	/**
-	 * Resolve the item handler exposed by another peripheral on the network, mirroring CC:Tweaked's own logic.
-	 */
 	@Nullable
 	private static IItemHandler extractHandler(IPeripheral peripheral) {
 		Object target = peripheral.getTarget();
@@ -208,12 +162,6 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 		if (event instanceof PackageEvent pe) {
 			queueEvent(pe.status, new PackageLuaObject(blockEntity, pe.box));
 		}
-	}
-
-	@NotNull
-	@Override
-	public Object getTarget() {
-		return blockEntity;
 	}
 
 	@NotNull
