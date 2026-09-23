@@ -275,7 +275,7 @@ public class SchematicPrinter {
 		BlockEntity blockEntity = null;
 		if (blockState.hasBlockEntity()) {
 			blockEntity = ((EntityBlock) blockState.getBlock()).newBlockEntity(target, blockState);
-			CompoundTag data = BlockHelper.prepareBlockEntityData(blockState, blockEntity);
+			CompoundTag data = BlockHelper.prepareBlockEntityData(blockState, blockReader.getBlockEntity(target));
 			if (blockEntity != null && data != null)
 				blockEntity.load(data);
 		}
